@@ -1,0 +1,117 @@
+{
+  "entities": {
+    "Item": {
+      "title": "Matériel/Mobilier",
+      "description": "Un article d'inventaire appartenant au Ministère ou aux Forces Armées.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Nom de l'article" },
+        "category": { "type": "string", "description": "Catégorie (Mobilier, Armement, Véhicule, etc.)" },
+        "serialNumber": { "type": "string", "description": "Numéro de série ou code barre" },
+        "condition": { "type": "string", "enum": ["Neuf", "Bon", "Usagé", "Endommagé", "En réparation"], "description": "État de l'article" },
+        "location": { "type": "string", "description": "Lieu de stockage ou d'utilisation" },
+        "organization": { "type": "string", "enum": ["Ministère de la Défense", "Forces Armées d'Haïti"], "description": "Organisation propriétaire" },
+        "quantity": { "type": "integer", "description": "Quantité en stock" },
+        "minThreshold": { "type": "integer", "description": "Seuil minimum pour alerte de stock bas" },
+        "unit": { "type": "string", "description": "Unité de mesure (pièce, lot, etc.)" },
+        "estimatedValue": { "type": "number", "description": "Valeur estimée de l'article" },
+        "acquiredDate": { "type": "string", "format": "date", "description": "Date d'acquisition" },
+        "lastInventoryDate": { "type": "string", "format": "date", "description": "Dernière date d'inventaire" },
+        "notes": { "type": "string", "description": "Notes additionnelles" },
+        "updatedBy": { "type": "string", "description": "UID de l'utilisateur ayant fait la dernière mise à jour" }
+      },
+      "required": ["name", "category", "organization", "quantity"]
+    },
+    "Category": {
+      "title": "Catégorie",
+      "description": "Classification des articles.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "Location": {
+      "title": "Emplacement",
+      "description": "Lieu physique de stockage.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "type": { "type": "string", "enum": ["Entrepôt", "Bureau", "Base Militaire", "Autre"] }
+      },
+      "required": ["name"]
+    },
+    "InventoryReport": {
+      "title": "Rapport d'Inventaire",
+      "description": "Rapport périodique sur l'état des stocks.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "organization": { "type": "string", "enum": ["Ministère de la Défense", "Forces Armées d'Haïti", "Global"] },
+        "summary": { "type": "string" },
+        "itemsCount": { "type": "integer" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["title", "date", "organization"]
+    },
+    "UserProfile": {
+      "title": "Profil Utilisateur",
+      "description": "Informations sur l'utilisateur du système.",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["Administrateur", "Officier Logistique", "Consultant"] },
+        "organization": { "type": "string", "enum": ["Ministère de la Défense", "Forces Armées d'Haïti"] }
+      },
+      "required": ["fullName", "email", "role"]
+    },
+    "Movement": {
+      "title": "Mouvement de Stock",
+      "description": "Suivi du déplacement d'un article entre deux unités.",
+      "type": "object",
+      "properties": {
+        "itemId": { "type": "string", "description": "ID de l'article concerné" },
+        "itemName": { "type": "string", "description": "Nom de l'article" },
+        "itemType": { "type": "string", "enum": ["Matériel", "Mobilier"], "description": "Type d'article" },
+        "quantity": { "type": "integer", "description": "Quantité déplacée" },
+        "originUnit": { "type": "string", "description": "Unité d'origine" },
+        "destinationUnit": { "type": "string", "description": "Unité de destination" },
+        "departureDate": { "type": "string", "format": "date", "description": "Date de départ" },
+        "arrivalDate": { "type": "string", "format": "date", "description": "Date d'arrivée prévue ou réelle" },
+        "status": { "type": "string", "enum": ["En transit", "Livré", "Annulé"], "description": "Statut du mouvement" },
+        "createdBy": { "type": "string", "description": "UID de l'utilisateur ayant créé le mouvement" }
+      },
+      "required": ["itemId", "quantity", "originUnit", "destinationUnit", "status"]
+    }
+  },
+  "firestore": {
+    "/items/{itemId}": {
+      "schema": "Item",
+      "description": "Collection principale des articles de logistique."
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Liste des catégories d'articles."
+    },
+    "/locations/{locationId}": {
+      "schema": "Location",
+      "description": "Liste des emplacements physiques."
+    },
+    "/reports/{reportId}": {
+      "schema": "InventoryReport",
+      "description": "Historique des rapports d'inventaire."
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Profils et permissions des utilisateurs."
+    },
+    "/movements/{movementId}": {
+      "schema": "Movement",
+      "description": "Historique des mouvements de matériel."
+    }
+  }
+}

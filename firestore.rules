@@ -1,0 +1,103 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    // Collection: items
+    // Fields: name (string), category (string), organization (string), quantity (int), condition (string), etc.
+    //
+    // Collection: users
+    // Fields: fullName (string), email (string), role (string), organization (string)
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        getUserData().role == 'Administrateur' || 
+        (request.auth.token.email == "ljguyht@gmail.com" && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isLogisticsOfficer() {
+      return isAuthenticated() && getUserData().role == 'Officier Logistique';
+    }
+
+    function isConsultant() {
+      return isAuthenticated() && getUserData().role == 'Consultant';
+    }
+
+    function belongsToOrg(org) {
+      return getUserData().organization == org;
+    }
+
+    // Validation Functions
+    function isValidItem(data) {
+      return data.keys().hasAll(['name', 'category', 'organization', 'quantity']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.category is string &&
+             data.organization in ["Ministère de la Défense", "Forces Armées d'Haïti"] &&
+             data.quantity is int && data.quantity >= 0 &&
+             (!('minThreshold' in data) || data.minThreshold is int) &&
+             (!('estimatedValue' in data) || data.estimatedValue is number);
+    }
+
+    function isValidMovement(data) {
+      return data.keys().hasAll(['itemId', 'quantity', 'originUnit', 'destinationUnit', 'status']) &&
+             data.itemId is string &&
+             data.quantity is int && data.quantity > 0 &&
+             data.status in ['En transit', 'Livré', 'Annulé'];
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['fullName', 'email', 'role']) &&
+             data.fullName is string && data.fullName.size() > 0 &&
+             data.email is string &&
+             data.role in ['Administrateur', 'Officier Logistique', 'Consultant'];
+    }
+
+    // Rules
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() || (request.auth.uid == userId && isValidUser(request.resource.data));
+    }
+
+    match /items/{itemId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() || 
+        (isLogisticsOfficer() && belongsToOrg(request.resource.data.organization) && isValidItem(request.resource.data));
+      allow delete: if isAdmin();
+    }
+
+    match /reports/{reportId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || isLogisticsOfficer();
+      allow update, delete: if isAdmin();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /locations/{locationId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /movements/{movementId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || isLogisticsOfficer();
+      allow update: if isAdmin() || (isLogisticsOfficer() && isValidMovement(request.resource.data));
+      allow delete: if isAdmin();
+    }
+  }
+}
