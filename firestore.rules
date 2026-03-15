@@ -47,7 +47,8 @@ service cloud.firestore {
              data.organization in ["Ministère de la Défense", "Forces Armées d'Haïti"] &&
              data.quantity is int && data.quantity >= 0 &&
              (!('minThreshold' in data) || data.minThreshold is int) &&
-             (!('estimatedValue' in data) || data.estimatedValue is number);
+             (!('estimatedValue' in data) || data.estimatedValue is number) &&
+             (!('serialNumber' in data) || (data.serialNumber is string && data.serialNumber.size() < 100));
     }
 
     function isValidMovement(data) {

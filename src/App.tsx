@@ -20,12 +20,16 @@ import {
   ArrowRightLeft,
   Calendar,
   Download,
-  History
+  History,
+  FileText,
+  Table,
+  Trash2
 } from 'lucide-react';
 import { 
   doc, 
   updateDoc, 
   addDoc, 
+  deleteDoc,
   onSnapshot, 
   collection,
   getDocFromServer
@@ -38,6 +42,9 @@ import {
   User
 } from 'firebase/auth';
 import { db, auth } from './firebase';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { 
   BarChart, 
   Bar, 
@@ -313,7 +320,7 @@ export default function App() {
 
   const handleUpdateItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!db || !user || !editingItem) return;
+    if (!db || !user || !editingItem || !editingItem.id) return;
     try {
       const itemRef = doc(db, 'items', editingItem.id);
       const { id, ...itemData } = editingItem;
@@ -328,12 +335,73 @@ export default function App() {
     }
   };
 
+  const handleDeleteItem = async (id: string) => {
+    if (!db || !user) return;
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer cet article ?")) return;
+    try {
+      await deleteDoc(doc(db, 'items', id));
+      setIsEditingItem(false);
+      setEditingItem(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `items/${id}`);
+    }
+  };
+
   const filteredItems = items.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          item.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesOrg = filterOrg === 'All' || item.organization === filterOrg;
     return matchesSearch && matchesOrg;
   });
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    const tableColumn = ["Nom", "Organisation", "Catégorie", "S/N", "Quantité", "État", "Emplacement"];
+    const tableRows = filteredItems.map(item => [
+      item.name,
+      item.organization,
+      item.category || '-',
+      item.serialNumber || '-',
+      item.quantity,
+      item.condition,
+      item.location || '-'
+    ]);
+
+    doc.setFontSize(18);
+    doc.text("Rapport d'Inventaire Logistique", 14, 22);
+    doc.setFontSize(11);
+    doc.text(`Généré le: ${new Date().toLocaleString()}`, 14, 30);
+    doc.text(`Filtre Organisation: ${filterOrg === 'All' ? 'Toutes' : filterOrg}`, 14, 38);
+
+    (doc as any).autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 45,
+      theme: 'grid',
+      headStyles: { fillColor: [15, 23, 42] }
+    });
+
+    doc.save(`rapport_inventaire_${new Date().getTime()}.pdf`);
+  };
+
+  const exportToExcel = () => {
+    const worksheet = XLSX.utils.json_to_sheet(filteredItems.map(item => ({
+      "Nom": item.name,
+      "Organisation": item.organization,
+      "Catégorie": item.category,
+      "Numéro de Série": item.serialNumber,
+      "Quantité": item.quantity,
+      "État": item.condition,
+      "Emplacement": item.location,
+      "Seuil Min": item.minThreshold,
+      "Valeur Estimée": item.estimatedValue,
+      "Date Acquisition": item.acquiredDate,
+      "Dernier Inventaire": item.lastInventoryDate
+    })));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Inventaire");
+    XLSX.writeFile(workbook, `rapport_inventaire_${new Date().getTime()}.xlsx`);
+  };
 
   const lowStockItems = items.filter(item => item.quantity <= (item.minThreshold || 0));
 
@@ -574,6 +642,22 @@ export default function App() {
                     <option value="Ministère de la Défense">MDH</option>
                     <option value="Forces Armées d'Haïti">FAd'H</option>
                   </select>
+                  <button 
+                    onClick={exportToPDF}
+                    className="bg-white text-slate-700 px-4 py-3 rounded-xl font-bold flex items-center gap-2 border border-slate-200 hover:bg-slate-50 active:scale-95 transition-all shadow-sm"
+                    title="Exporter en PDF"
+                  >
+                    <FileText className="w-5 h-5" />
+                    <span className="hidden md:inline">PDF</span>
+                  </button>
+                  <button 
+                    onClick={exportToExcel}
+                    className="bg-white text-slate-700 px-4 py-3 rounded-xl font-bold flex items-center gap-2 border border-slate-200 hover:bg-slate-50 active:scale-95 transition-all shadow-sm"
+                    title="Exporter en Excel"
+                  >
+                    <Table className="w-5 h-5" />
+                    <span className="hidden md:inline">Excel</span>
+                  </button>
                   <button 
                     onClick={() => setIsAddingItem(true)}
                     className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 active:scale-95 transition-all shadow-md"
@@ -845,6 +929,16 @@ export default function App() {
                   />
                 </div>
                 <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">Numéro de Série / Code Barre</label>
+                  <input 
+                    type="text" 
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-900"
+                    value={newItem.serialNumber || ''}
+                    onChange={e => setNewItem({...newItem, serialNumber: e.target.value})}
+                    placeholder="S/N: ..."
+                  />
+                </div>
+                <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Organisation</label>
                   <select 
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-900"
@@ -964,6 +1058,16 @@ export default function App() {
                   />
                 </div>
                 <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">Numéro de Série / Code Barre</label>
+                  <input 
+                    type="text" 
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-900"
+                    value={editingItem.serialNumber || ''}
+                    onChange={e => setEditingItem({...editingItem, serialNumber: e.target.value})}
+                    placeholder="S/N: ..."
+                  />
+                </div>
+                <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Organisation</label>
                   <select 
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-900"
@@ -1049,8 +1153,16 @@ export default function App() {
                   />
                 </div>
               </div>
-              <div className="pt-4">
-                <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg">
+              <div className="pt-4 flex gap-4">
+                <button 
+                  type="button"
+                  onClick={() => editingItem.id && handleDeleteItem(editingItem.id)}
+                  className="flex-1 bg-red-50 text-red-600 py-4 rounded-xl font-bold hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  Supprimer
+                </button>
+                <button type="submit" className="flex-[2] bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg">
                   Mettre à jour l'Article
                 </button>
               </div>
