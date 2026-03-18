@@ -10,7 +10,12 @@
         "serialNumber": { "type": "string", "description": "Numéro de série ou code barre" },
         "condition": { "type": "string", "enum": ["Neuf", "Bon", "Usagé", "Endommagé", "En réparation"], "description": "État de l'article" },
         "location": { "type": "string", "description": "Lieu de stockage ou d'utilisation" },
-        "organization": { "type": "string", "enum": ["Ministère de la Défense", "Forces Armées d'Haïti"], "description": "Organisation propriétaire" },
+        "organization": { "type": "string", "enum": ["Ministère de la Défense", "Forces Armées d'Haïti", "Conjoint (Ministère & FAd'H)"], "description": "Organisation propriétaire" },
+        "service": { "type": "string", "description": "Service spécifique (ex: Logistique, Transmissions)" },
+        "direction": { "type": "string", "description": "Direction (ex: Direction Générale, Direction Administrative)" },
+        "deptDirection": { "type": "string", "description": "Direction Départementale (ex: Nord, Ouest)" },
+        "section": { "type": "string", "description": "Section ou Bureau spécifique" },
+        "militaryUnitId": { "type": "string", "description": "ID de l'unité militaire (FAd'H) associée" },
         "quantity": { "type": "integer", "description": "Quantité en stock" },
         "minThreshold": { "type": "integer", "description": "Seuil minimum pour alerte de stock bas" },
         "unit": { "type": "string", "description": "Unité de mesure (pièce, lot, etc.)" },
@@ -18,7 +23,16 @@
         "acquiredDate": { "type": "string", "format": "date", "description": "Date d'acquisition" },
         "lastInventoryDate": { "type": "string", "format": "date", "description": "Dernière date d'inventaire" },
         "notes": { "type": "string", "description": "Notes additionnelles" },
-        "updatedBy": { "type": "string", "description": "UID de l'utilisateur ayant fait la dernière mise à jour" }
+        "icon": { "type": "string", "description": "Nom de l'icône Lucide à afficher" },
+        "updatedBy": { "type": "string", "description": "UID de l'utilisateur ayant fait la dernière mise à jour" },
+        "munitions": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "description": "Type de munitions (ex: 5.56mm, 9mm)" },
+            "quantity": { "type": "integer", "description": "Quantité de munitions" }
+          },
+          "description": "Munitions associées à l'article"
+        }
       },
       "required": ["name", "category", "organization", "quantity"]
     },
@@ -50,7 +64,7 @@
       "properties": {
         "title": { "type": "string" },
         "date": { "type": "string", "format": "date-time" },
-        "organization": { "type": "string", "enum": ["Ministère de la Défense", "Forces Armées d'Haïti", "Global"] },
+        "organization": { "type": "string", "enum": ["Ministère de la Défense", "Forces Armées d'Haïti", "Conjoint (Ministère & FAd'H)", "Global"] },
         "summary": { "type": "string" },
         "itemsCount": { "type": "integer" },
         "createdBy": { "type": "string" }
@@ -65,7 +79,7 @@
         "fullName": { "type": "string" },
         "email": { "type": "string" },
         "role": { "type": "string", "enum": ["Administrateur", "Officier Logistique", "Consultant"] },
-        "organization": { "type": "string", "enum": ["Ministère de la Défense", "Forces Armées d'Haïti"] }
+        "organization": { "type": "string", "enum": ["Ministère de la Défense", "Forces Armées d'Haïti", "Conjoint (Ministère & FAd'H)"] }
       },
       "required": ["fullName", "email", "role"]
     },
@@ -86,6 +100,33 @@
         "createdBy": { "type": "string", "description": "UID de l'utilisateur ayant créé le mouvement" }
       },
       "required": ["itemId", "quantity", "originUnit", "destinationUnit", "status"]
+    },
+    "MilitaryUnit": {
+      "title": "Unité Militaire",
+      "description": "Une unité ou branche des Forces Armées d'Haïti.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Nom de l'unité (ex: Corps d'Aviation)" },
+        "branch": { "type": "string", "enum": ["Armée de Terre", "Corps d'Aviation", "Garde-Côtes", "Génie Militaire", "Service de Santé", "Autre"], "description": "Branche de l'armée" },
+        "location": { "type": "string", "description": "Base ou caserne principale" },
+        "commander": { "type": "string", "description": "Nom du commandant de l'unité" },
+        "personnelCount": { "type": "integer", "description": "Nombre approximatif de personnel" },
+        "description": { "type": "string", "description": "Description de la mission de l'unité" }
+      },
+      "required": ["name", "branch"]
+    },
+    "PreAuthorizedUser": {
+      "title": "Utilisateur Pré-Autorisé",
+      "description": "Email et niveau d'accréditation définis par un administrateur.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["Administrateur", "Officier Logistique", "Consultant"] },
+        "organization": { "type": "string", "enum": ["Ministère de la Défense", "Forces Armées d'Haïti", "Conjoint (Ministère & FAd'H)"] },
+        "addedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role", "organization"]
     }
   },
   "firestore": {
@@ -109,9 +150,17 @@
       "schema": "UserProfile",
       "description": "Profils et permissions des utilisateurs."
     },
+    "/pre_authorized_users/{userId}": {
+      "schema": "PreAuthorizedUser",
+      "description": "Liste des emails autorisés avec leur rôle prédéfini."
+    },
     "/movements/{movementId}": {
       "schema": "Movement",
       "description": "Historique des mouvements de matériel."
+    },
+    "/units/{unitId}": {
+      "schema": "MilitaryUnit",
+      "description": "Gestion des unités et branches militaires."
     }
   }
 }

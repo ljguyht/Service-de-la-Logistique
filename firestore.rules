@@ -44,11 +44,22 @@ service cloud.firestore {
       return data.keys().hasAll(['name', 'category', 'organization', 'quantity']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
              data.category is string &&
-             data.organization in ["Ministère de la Défense", "Forces Armées d'Haïti"] &&
+             data.organization in ["Ministere de la Defense", "Forces Armees d'Haiti", "Conjoint (Ministere & FAdH)"] &&
              data.quantity is int && data.quantity >= 0 &&
              (!('minThreshold' in data) || data.minThreshold is int) &&
              (!('estimatedValue' in data) || data.estimatedValue is number) &&
-             (!('serialNumber' in data) || (data.serialNumber is string && data.serialNumber.size() < 100));
+             (!('serialNumber' in data) || (data.serialNumber is string && data.serialNumber.size() < 100)) &&
+             (!('icon' in data) || (data.icon is string && data.icon.size() < 50)) &&
+             (!('service' in data) || (data.service is string && data.service.size() < 200)) &&
+             (!('direction' in data) || (data.direction is string && data.direction.size() < 200)) &&
+             (!('deptDirection' in data) || (data.deptDirection is string && data.deptDirection.size() < 200)) &&
+             (!('section' in data) || (data.section is string && data.section.size() < 200)) &&
+             (!('militaryUnitId' in data) || (data.militaryUnitId is string && data.militaryUnitId.size() < 100)) &&
+             (!('munitions' in data) || (
+               data.munitions is map &&
+               (!('type' in data.munitions) || (data.munitions.type is string && data.munitions.type.size() < 100)) &&
+               (!('quantity' in data.munitions) || data.munitions.quantity is int)
+             ));
     }
 
     function isValidMovement(data) {
@@ -56,6 +67,16 @@ service cloud.firestore {
              data.itemId is string &&
              data.quantity is int && data.quantity > 0 &&
              data.status in ['En transit', 'Livré', 'Annulé'];
+    }
+
+    function isValidUnit(data) {
+      return data.keys().hasAll(['name', 'branch']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.branch in ["Armée de Terre", "Corps d'Aviation", "Garde-Côtes", "Génie Militaire", "Service de Santé", "Autre"] &&
+             (!('location' in data) || (data.location is string && data.location.size() < 100)) &&
+             (!('commander' in data) || (data.commander is string && data.commander.size() < 100)) &&
+             (!('personnelCount' in data) || (data.personnelCount is int)) &&
+             (!('description' in data) || (data.description is string && data.description.size() < 500));
     }
 
     function isValidUser(data) {
@@ -68,7 +89,13 @@ service cloud.firestore {
     // Rules
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAdmin() || (request.auth.uid == userId && isValidUser(request.resource.data));
+      allow create: if isAuthenticated() && (request.auth.uid == userId || isAdmin()) && isValidUser(request.resource.data);
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin()) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /pre_authorized_users/{docId} {
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.token.email == resource.data.email);
+      allow create, update, delete: if isAdmin();
     }
 
     match /items/{itemId} {
@@ -98,6 +125,12 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAdmin() || isLogisticsOfficer();
       allow update: if isAdmin() || (isLogisticsOfficer() && isValidMovement(request.resource.data));
+      allow delete: if isAdmin();
+    }
+
+    match /units/{unitId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() || (isLogisticsOfficer() && belongsToOrg("Forces Armées d'Haïti") && isValidUnit(request.resource.data));
       allow delete: if isAdmin();
     }
   }
